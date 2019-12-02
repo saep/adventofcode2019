@@ -3,13 +3,9 @@
 --module Day1 (solution) where
 module Day1  where
 
-import RIO
+import PreludeAoC
 import qualified RIO.List as List
-import Text.Megaparsec
-import Text.Megaparsec.Char
 import qualified Text.Megaparsec.Char.Lexer as L
-
-type Parser a = Parsec Void Text a
 
 --- Day 1: The Tyranny of the Rocket Equation ---
 
@@ -96,19 +92,9 @@ parseMasses
 parseMasses =
   catMaybes <$> (parseMass `sepBy` newline)
 
-parseMassesFromDay1File :: IO [Integer]
-parseMassesFromDay1File =  do
-  let file = "input/Day1-1.txt"
-  input <- readFileUtf8 file
-  case runParser parseMasses file input of
-    Left e ->
-      error $ errorBundlePretty e
-    Right masses ->
-      pure masses
-
 solutions :: IO (Integer, Integer)
 solutions = do
-  moduleMasses <- parseMassesFromDay1File
+  moduleMasses <- parseFile "input/Day1-1.txt" parseMasses
   let fuelForMasses = sum $ map fuel moduleMasses
       fuelForMassesAndFuel = sum $ map fuelWithFuelForFuel moduleMasses
   pure (fuelForMasses, fuelForMassesAndFuel)
