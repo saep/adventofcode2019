@@ -1,0 +1,19 @@
+name:                aoc2019
+version:             0.1.0.0
+github:              "saep/aoc2019"
+license:             PublicDomain
+author:              "Sebastian Witte"
+maintainer:          "woozletoff@gmail.com"
+copyright:           "2019 Sebastian Witte"
+
+description:         Advent of Code solutions 2019
+
+dependencies:
+- base >= 4.7 && < 5
+- rio
+- pretty-simple
+- megaparsec
+- streamly
+
+library:
+  source-dirs: src
