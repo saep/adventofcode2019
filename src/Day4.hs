@@ -48,34 +48,41 @@ How many different passwords within the range given in your puzzle input meet al
 Your puzzle input is still 235741-706948.
 -}
 
-input :: (Int, Int)
-input = (235741, 706948)
+newtype Password = Password Int
+  deriving (Eq, Ord, Show)
 
-isInInputRange :: Int -> Bool
+input :: (Password, Password)
+input = (Password 235741, Password 706948)
+
+isInInputRange :: Password -> Bool
 isInInputRange i = i >= fst input && i <= snd input
 
-digitsToNum :: NonEmpty Int -> Int
-digitsToNum = go 1 . NEList.toList
+digitsToPassword :: NonEmpty Int -> Password
+digitsToPassword = Password . go 1 . NEList.toList
   where
     go _ [] = 0
     go n (x:xs) = n*x + go (n*10) xs
 
-gen :: Int -> Bool -> NonEmpty Int -> [(Int, [Int])]
+gen :: Int -> Bool -> NonEmpty Int -> [(Password, [Int])]
 gen 0 hasDouble xs
-  | hasDouble = [(digitsToNum xs, NEList.toList xs)]
+  | hasDouble = [(digitsToPassword xs, NEList.toList xs)]
   | otherwise = []
 gen d hasDouble (x:|xs) = concat
   [ gen (d-1) (hasDouble || x == x') (x':|x:xs)
   | x' <- [x..9]
   ]
 
+solutions1 :: [(Password, [Int])]
 solutions1 = filter (isInInputRange . fst) $ concatMap (gen 5 False . (:|[])) [2..9]
 
+solution1 :: Int
 solution1 = length solutions1
 
 notPartOfLargerGroup :: [Int] -> Bool
 notPartOfLargerGroup = or . map ((2==) . length) . List.group 
 
+solutions2 :: [(Password, [Int])]
 solutions2 = filter (notPartOfLargerGroup . snd) $ solutions1
 
+solution2 :: Int
 solution2 = length solutions2

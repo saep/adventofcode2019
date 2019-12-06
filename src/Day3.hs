@@ -109,10 +109,6 @@ What is the fewest combined steps the wires must take to reach an intersection?
 
 -}
 
-ex11 = [ R 75,D 30,R 83,U 83,L 12,D 49,R 71,U 7,L 72]
-ex12 = [U 62,R 66,U 55,R 34,D 71,R 55,D 58,R 83]
-  -- = distance 159
-
 data Direction = R Int | L Int | U Int | D Int
   deriving (Eq, Ord, Show)
 

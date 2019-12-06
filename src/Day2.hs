@@ -5,10 +5,6 @@ module Day2 where
 import PreludeAoC
 import IntCodeInterpreter
 import qualified Data.Vector.Unboxed as Vector
-import Data.Vector.Unboxed.Mutable (MVector)
-import qualified Data.Vector.Unboxed.Mutable as MVector
-import qualified Text.Megaparsec.Char.Lexer as L
-import qualified Prelude
 
 {-
 --- Day 2: 1202 Program Alarm ---
@@ -148,7 +144,6 @@ solution1 :: IO Int
 solution1 = do
   (i:_:_:is) <- parseFile "input/Day2-1.txt" parseIntCodes
   let codes = (i:12:2:is)
-  Prelude.print codes
   Vector.headM $ snd $ eval [] codes
 
 solution2 :: IO Int
