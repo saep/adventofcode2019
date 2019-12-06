@@ -3,10 +3,12 @@
 module Day2 where
 
 import PreludeAoC
+import IntCodeInterpreter
 import qualified Data.Vector.Unboxed as Vector
 import Data.Vector.Unboxed.Mutable (MVector)
 import qualified Data.Vector.Unboxed.Mutable as MVector
 import qualified Text.Megaparsec.Char.Lexer as L
+import qualified Prelude
 
 {-
 --- Day 2: 1202 Program Alarm ---
@@ -142,41 +144,12 @@ answer would be 1202.)
 
 -}
 
-step
-  :: PrimMonad m
-  => Int
-  -> MVector (PrimState m) Int
-  -> m (MVector (PrimState m) Int)
-step pos intCodes = do
-  let applyOpcode f = do
-        i <- MVector.read intCodes (pos+1)
-        j <- MVector.read intCodes (pos+2)
-        outputPosition <- MVector.read intCodes (pos+3)
-        valueAtI <- MVector.read intCodes i
-        valueAtJ <- MVector.read intCodes j
-        MVector.write intCodes outputPosition (f valueAtI valueAtJ)
-        step (pos+4) intCodes
-  op <- MVector.read intCodes pos
-  case op of
-    1 -> applyOpcode (+)
-    2 -> applyOpcode (*)
-    99 -> pure intCodes
-    _ -> error "invalid state"
-
-parseIntCodes :: Parser [Int]
-parseIntCodes = L.decimal `sepBy` char ','
-
-eval :: [Int] -> Vector.Vector Int
-eval codes =
-  Vector.create $ do
-    v <- MVector.new (length codes) 
-    zipWithM_ (MVector.write v) [0..] codes
-    step 0 v
-
 solution1 :: IO Int
 solution1 = do
   (i:_:_:is) <- parseFile "input/Day2-1.txt" parseIntCodes
-  Vector.headM $ eval (i:12:2:is)
+  let codes = (i:12:2:is)
+  Prelude.print codes
+  Vector.headM $ snd $ eval [] codes
 
 solution2 :: IO Int
 solution2 = do
@@ -184,7 +157,7 @@ solution2 = do
   let solutions = [ noun * 100 + verb
                   | noun <- [0..99]
                   , verb <- [0..99]
-                  , Vector.headM (eval (i:noun:verb:is)) == Just 19690720
+                  , Vector.headM (snd (eval [] (i:noun:verb:is))) == Just 19690720
                   ]
   case solutions of
     (x:_) ->

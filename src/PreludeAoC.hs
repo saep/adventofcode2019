@@ -4,9 +4,12 @@ module PreludeAoC
   , parseFile
   ) where
 
-import RIO as X hiding (try, many, some)
-import Text.Megaparsec as X
+import RIO as X hiding (try, many, some, Reader, ask, runReader, local, asks)
+import Text.Megaparsec as X hiding (State)
 import Text.Megaparsec.Char as X
+import Polysemy as X
+import Polysemy.Reader as X
+import Polysemy.State as X
 
 type Parser a = Parsec Void Text a
 
