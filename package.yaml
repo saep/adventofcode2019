@@ -8,13 +8,35 @@ copyright:           "2019 Sebastian Witte"
 
 description:         Advent of Code solutions 2019
 
+default-extensions:
+- DataKinds
+- FlexibleContexts
+- GADTs
+- LambdaCase
+- NoImplicitPrelude
+- PolyKinds
+- RankNTypes
+- ScopedTypeVariables
+- TypeApplications
+- TypeOperators
+- TypeFamilies
+
 dependencies:
 - base >= 4.7 && < 5
 - rio
 - pretty-simple
 - megaparsec
+- polysemy
+- polysemy-plugin
 - streamly
 - vector
 
 library:
   source-dirs: src
+  ghc-options:
+  - -funbox-strict-fields
+  - -Wall
+  - -fno-warn-unused-do-bind
+  - -O2
+  - -flate-specialise
+  - -fspecialise-aggressively
