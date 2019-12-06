@@ -30,6 +30,9 @@ dependencies:
 - polysemy-plugin
 - streamly
 - vector
+# actually just testing 
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src
@@ -40,3 +43,12 @@ library:
   - -O2
   - -flate-specialise
   - -fspecialise-aggressively
+
+tests:
+  hspec:
+    main: Spec.hs
+    source-dirs: tests
+    dependencies:
+    - QuickCheck >=2
+    - hspec
+    - aoc2019
