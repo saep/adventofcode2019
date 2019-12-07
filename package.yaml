@@ -28,6 +28,7 @@ dependencies:
 - megaparsec
 - polysemy
 - polysemy-plugin
+- primitive
 - streamly
 - vector
 # actually just testing 

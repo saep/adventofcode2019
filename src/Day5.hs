@@ -4,14 +4,13 @@ import PreludeAoC
 import IntCodeInterpreter
 
 
-solution1 :: IO ([InterpreterOutput], Code)
+solution1 :: IO [InterpreterOutput]
 solution1 = do
-  codes <- parseFile "input/Day5-1.txt" parseIntCodes
-  pure $ eval [InterpreterInput 1] codes
+  flip eval' [InterpreterInput 1] <$> parseFile "input/Day5-1.txt" parseIntCodes
 
-solution2 :: IO ([InterpreterOutput], Code)
+solution2 :: IO [InterpreterOutput]
 solution2 =
-  eval [InterpreterInput 5] <$> parseFile "input/Day5-1.txt" parseIntCodes
+  flip eval' [InterpreterInput 5] <$> parseFile "input/Day5-1.txt" parseIntCodes
 
 {--- Day 5: Sunny with a Chance of Asteroids ---
 

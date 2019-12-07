@@ -140,11 +140,13 @@ answer would be 1202.)
 
 -}
 
+getCode (f,_,_) = f
+
 solution1 :: IO Int
 solution1 = do
   (i:_:_:is) <- parseFile "input/Day2-1.txt" parseIntCodes
   let codes = (i:12:2:is)
-  Vector.headM $ snd $ eval [] codes
+  Vector.headM $ getCode $ eval codes []
 
 solution2 :: IO Int
 solution2 = do
@@ -152,7 +154,7 @@ solution2 = do
   let solutions = [ noun * 100 + verb
                   | noun <- [0..99]
                   , verb <- [0..99]
-                  , Vector.headM (snd (eval [] (i:noun:verb:is))) == Just 19690720
+                  , Vector.headM (getCode (eval (i:noun:verb:is) [])) == Just 19690720
                   ]
   case solutions of
     (x:_) ->
