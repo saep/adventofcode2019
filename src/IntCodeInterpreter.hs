@@ -11,6 +11,8 @@ module IntCodeInterpreter
   , InterpreterInput(..)
   , InterpreterOutput(..)
   , CPU
+  , PureCPU(..)
+  , freezeCPU
   , Address
   , createCPU
   , createCPUfromCode
@@ -44,10 +46,16 @@ newtype Address = Address { getAddress :: Int }
   deriving (Eq, Ord, Show)
   deriving Num via Int
 
+data PureCPU = PureCPU
+  { pureMemory       :: Vector.Vector Int
+  , pureIP           :: Address
+  , pureRelativeBase :: Address
+  } deriving (Show, Eq)
 
 data CPU m = CPU
-  { memory :: (MutVar (PrimState m) (Memory m))
-  , ip     :: (MutVar (PrimState m) Address)
+  { memory       :: (MutVar (PrimState m) (Memory m))
+  , ip           :: (MutVar (PrimState m) Address)
+  , relativeBase :: (MutVar (PrimState m) Address)
   }
 
 data CPUState m r a where
@@ -55,6 +63,9 @@ data CPUState m r a where
   SetIP :: Address -> CPUState m r ()
   ReadAddr :: Address -> CPUState m r Int
   WriteAddr :: Address -> Int -> CPUState m r ()
+  AddRelativeBase :: Address -> CPUState m r ()
+  GetRelativeBase :: CPUState m r Address
+  TraceCPUState :: CPUState m r String
 makeSem ''CPUState
 
 runCPUState
@@ -69,11 +80,35 @@ runCPUState CPU{..} = interpret $ \case
   SetIP addr -> embed $
     writeMutVar ip addr
   ReadAddr (Address addr) -> embed $ do
-    mem <- readMutVar memory
-    MVector.unsafeRead mem addr
+    mem <- readMemory memory (Address addr)
+    MVector.read mem addr
   WriteAddr (Address addr) value -> embed $ do
-    mem <- readMutVar memory
-    MVector.unsafeWrite mem addr value
+    mem <- readMemory memory (Address addr)
+    MVector.write mem addr value
+  AddRelativeBase addr -> embed $
+    modifyMutVar relativeBase (+addr)
+  GetRelativeBase -> embed $
+    readMutVar relativeBase
+  TraceCPUState -> embed $ do
+    mem <- Vector.freeze =<< readMutVar memory
+    relativeBase' <- readMutVar relativeBase
+    ip' <- readMutVar ip
+    pure $ show mem <> " RB: " <> show relativeBase' <> " IP: " <> show ip'
+
+
+readMemory :: PrimMonad m => MutVar (PrimState m) (Memory m) -> Address -> m (Memory m)
+readMemory memory' (Address addr) = do
+  mem <- readMutVar memory'
+  mem' <- if (addr < MVector.length mem)
+    then pure mem
+    else do
+      let len = MVector.length mem
+      v <- MVector.grow mem $ max (addr + 1) (MVector.length mem * 2)
+      forM_ [len..len*2-1] $ \i -> MVector.write v i 0
+      pure v
+
+  writeMutVar memory' mem'
+  pure mem'
 
 addIP
   :: Members '[CPUState m] r
@@ -82,7 +117,6 @@ addIP
   -> Sem r ()
 addIP i = 
   setIP . (+i) =<< getIP
-
 
 readArg
   :: Members '[CPUState m] r
@@ -98,14 +132,27 @@ readValueAt
   => PrimMonad m
   => Address
   -> Sem r Int
-readValueAt i = do
+readValueAt i =
+  readAddrAt i >>= readAddr
+
+readAddrAt
+  :: Members '[CPUState m, State Mode] r
+  => PrimMonad m
+  => Address
+  -> Sem r Address
+readAddrAt i = do
   (mode', mode) <- gets @Mode (`divMod` 10)
-  posToRead <- case mode of
+  addr <- case mode of
         0 -> Address <$> readAddr i
         1 -> pure i
+        2 -> do
+          rb <- getRelativeBase
+          addr <- Address <$> readAddr i
+          pure $ rb + addr
         _ -> error "unknown parameter mode"
   put mode'
-  readAddr posToRead
+  pure addr
+
 
 applyBinaryOperation
   :: Members '[CPUState m, State Mode] r
@@ -116,7 +163,7 @@ applyBinaryOperation f = do
   pos <- getIP
   i <- readValueAt (pos+1)
   j <- readValueAt (pos+2)
-  storeAt <- Address <$> readArg 3
+  storeAt <- readAddrAt (pos+3)
   writeAddr storeAt (f i j)
   addIP 4
 
@@ -129,7 +176,7 @@ testPredicate p = do
   pos <- getIP
   i <- readValueAt (pos+1)
   j <- readValueAt (pos+2)
-  storeAt <- Address <$> readAddr (pos+3)
+  storeAt <- readAddrAt (pos+3)
   addIP 4
   if p i j
     then writeAddr storeAt 1
@@ -152,8 +199,11 @@ step
   => PrimMonad m
   => Sem r ()
 step = do
+  -- cpuStateStr <- traceCPUState
+  -- modeAndOperation <- traceShow cpuStateStr $ readArg 0
   modeAndOperation <- readArg 0
   pos <- getIP
+
   case modeAndOperation `divMod` 100 of
     (_, 99) ->
       pure ()
@@ -163,12 +213,12 @@ step = do
     (mode, 2) -> do
       evalState mode (applyBinaryOperation (*))
       step
-    (_, 3) -> input >>= \case
+    (mode, 3) -> input >>= \case
       Nothing ->
         pure ()
       Just (InterpreterInput i) -> do
-        storeAt <- readArg 1
-        writeAddr (Address storeAt) i
+        storeAt <- evalState mode $ readAddrAt (pos+1)
+        writeAddr storeAt i
         addIP 2
         step
     (mode, 4) -> do
@@ -186,6 +236,11 @@ step = do
       step
     (mode, 8) -> do
       evalState mode (testPredicate (==))
+      step
+    (mode, 9) -> do
+      adj <- evalState mode (readValueAt (pos+1))
+      addRelativeBase (Address adj)
+      addIP 2
       step
     (_, op) ->
       error $ "unknown opcode: " <> show op
@@ -207,16 +262,27 @@ createCPU intCode = do
   code <- Vector.unsafeThaw $ Vector.fromList intCode
   memory <- newMutVar code
   ip <- newMutVar 0
+  relativeBase <- newMutVar 0
   pure CPU{..}
+
+freezeCPU
+  :: PrimMonad m
+  => CPU m
+  -> m (PureCPU)
+freezeCPU CPU{..} = do
+  pureMemory <- Vector.freeze =<< readMutVar memory
+  pureIP <- readMutVar ip
+  pureRelativeBase <- readMutVar relativeBase
+  pure PureCPU{..}
 
 createCPUfromCode
   :: PrimMonad m
-  => Code
-  -> Address
+  => PureCPU
   -> m (CPU m)
-createCPUfromCode code pos = do
-  memory <- newMutVar =<< Vector.thaw code
-  ip <- newMutVar pos
+createCPUfromCode PureCPU{..} = do
+  memory <- newMutVar =<< Vector.thaw pureMemory
+  ip <- newMutVar pureIP
+  relativeBase <- newMutVar pureRelativeBase
   pure CPU{..}
 
 showCPU :: PrimMonad m => CPU m -> m String
@@ -230,18 +296,17 @@ eval'
   :: [Int]
   -> [InterpreterInput]
   -> [InterpreterOutput]
-eval' intCode = (\(_,_,out) -> out) . eval intCode
+eval' intCode = snd . eval intCode
 
 eval
   :: [Int]
   -> [InterpreterInput]
-  -> (Code, Address, [InterpreterOutput])
+  -> (PureCPU, [InterpreterOutput])
 eval intCode is = runST $ do
     cpu@CPU{..} <- createCPU intCode
     out <- evalM cpu is
-    code <- Vector.unsafeFreeze =<< readMutVar memory
-    ip' <- readMutVar ip
-    pure (code, ip', out)
+    pureCPU <- freezeCPU cpu
+    pure (pureCPU, out)
 
 evalM
   :: PrimMonad m

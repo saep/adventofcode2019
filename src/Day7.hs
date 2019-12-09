@@ -14,15 +14,15 @@ type Setting = [PhaseSetting]
 outToIn :: InterpreterOutput -> InterpreterInput
 outToIn (InterpreterOutput o) = InterpreterInput o
 
-runCode :: [Int] -> Setting -> ([(Code, Address)], InterpreterOutput)
+runCode :: [Int] -> Setting -> ([PureCPU], InterpreterOutput)
 runCode code setting = foldl' go ([], 0) setting
   where
     go ::
-      ([(Code, Address)], InterpreterOutput)
+      ([PureCPU], InterpreterOutput)
       -> InterpreterInput
-      -> ([(Code, Address)], InterpreterOutput)
+      -> ([PureCPU], InterpreterOutput)
     go (cs, prev) s = case eval code [s, outToIn prev] of
-      (c, pos, [n]) -> ((c, pos):cs, n)
+      (cpu, [n]) -> (cpu:cs, n)
       res -> error $ "Invalid result: " <> show res
 
 solution1 :: IO (Maybe InterpreterOutput)
@@ -37,11 +37,11 @@ data FeedbackLoop m = FeedbackLoop
 
 initFeedbackLoop
   :: PrimMonad m
-  => [(Code, Address)]
+  => [PureCPU]
   -> Setting
   -> m (FeedbackLoop m)
 initFeedbackLoop codes setting = do
-  cpus <- mapM (uncurry createCPUfromCode) codes
+  cpus <- mapM createCPUfromCode codes
   let amplifiers = Vector.fromList $ zip setting cpus
   let amplifierEvaluations = 0
   pure FeedbackLoop{..}
@@ -56,7 +56,7 @@ runFeedbackLoopOnce (InterpreterInput firstInput) =
     where
       go Nothing _ = pure Nothing
       go o [] = pure $ fmap InterpreterOutput o
-      go (Just i) ((p,a):as) = do
+      go (Just i) ((_,a):as) = do
         out <- embed $ evalM a [InterpreterInput i]
         modify $ \st -> st { amplifierEvaluations = amplifierEvaluations st + 1}
         case out of
@@ -72,11 +72,11 @@ runFeedbackLoop
 runFeedbackLoop intCode setting = do
   let (codes, o) = runCode intCode setting
   feedbackLoop <- initFeedbackLoop codes setting
-  let loop (Just old) = do
+  let loop old = do
         out <- runFeedbackLoopOnce (outToIn old)
-        maybe (pure (Just old)) (loop . Just) out
-  (_, result) <- runM . runState feedbackLoop $ loop (Just o)
-  pure result
+        maybe (pure old) loop out
+  (_, result) <- runM . runState feedbackLoop $ loop o
+  pure $ Just result
 
 solution2 :: IO (Maybe InterpreterOutput)
 solution2 = do
